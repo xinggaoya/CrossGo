@@ -59,28 +59,26 @@ func CrossCompile(name string) {
 	}
 	for _, p := range systems {
 		for _, a := range architectures {
-			go func() {
-				buildPath := path.Join(defaultBuildPath, fmt.Sprintf("%s-%s", p, a))
-				if err := os.MkdirAll(buildPath, 0755); err != nil {
-					log.Fatalf("Error creating directory: %v", err)
-				}
+			buildPath := path.Join(defaultBuildPath, fmt.Sprintf("%s-%s", p, a))
+			if err := os.MkdirAll(buildPath, 0755); err != nil {
+				log.Fatalf("Error creating directory: %v", err)
+			}
 
-				os.Setenv("GOOS", p)
-				os.Setenv("GOARCH", a)
+			os.Setenv("GOOS", p)
+			os.Setenv("GOARCH", a)
 
-				outputFile := path.Join(buildPath, lastDir)
-				if p == "windows" {
-					outputFile += ".exe"
-				}
+			outputFile := path.Join(buildPath, lastDir)
+			if p == "windows" {
+				outputFile += ".exe"
+			}
 
-				cmd := exec.Command("go", "build", "-o", outputFile)
-				cmd.Stdout = os.Stdout
-				cmd.Stderr = os.Stderr
-				if err = cmd.Run(); err != nil {
-					log.Fatalf("Error compiling for %s-%s: %v", p, a, err)
-				}
-				log.Printf("CrossCompile %s-%s Success\n", p, a)
-			}()
+			cmd := exec.Command("go", "build", "-o", outputFile)
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			if err = cmd.Run(); err != nil {
+				log.Fatalf("Error compiling for %s-%s: %v", p, a, err)
+			}
+			log.Printf("CrossCompile %s-%s Success\n", p, a)
 		}
 	}
 
