@@ -1,39 +1,39 @@
 package cmd
 
 import (
+	"flag"
 	"fmt"
 	"log"
-	"log/slog"
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 )
 
+const defaultBuildPath = "bin"
+
 func Run() {
-	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-		AddSource: true,
-		Level:     slog.LevelDebug,
-	})))
-	// 获取命令行参数
-	// os.Args[0] 是命令本身的名字 os.Args[1:] 是传递给命令的参数
-	args := os.Args[1:]
+	// 设置默认日志处理器
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
+	// 解析命令行参数
+	flag.Parse()
+	args := flag.Args()
 
 	SelectCmd(args)
 }
 
-// SelectCmd 选择命令
 func SelectCmd(args []string) {
 	if len(args) == 0 {
-		println("Usage: cs [command]")
+		fmt.Println("Usage: cs [command]")
 		return
 	}
 	switch args[0] {
 	case "build":
-		if len(args) > 1 && args[1] != "" {
+		if args[1] != "" {
 			CrossCompile(args[1])
-		} else {
-			CrossCompile("")
 		}
+		CrossCompile("")
 	case "v":
 		fmt.Println("cs version: 0.0.1")
 	default:
@@ -41,44 +41,48 @@ func SelectCmd(args []string) {
 	}
 }
 
-// CrossCompile 交叉编译
-func CrossCompile(fileName string) {
-	buildPath := "bin"
+func CrossCompile(name string) {
 
-	system := []string{"linux", "windows", "darwin"}
-	arch := []string{"amd64", "arm64"}
-	for _, p := range system {
-		// os.Setenv 设置环境变量
-		for _, a := range arch {
-			buildPath = "bin/" + p + "-" + a
-			os.Setenv("GOOS", p)
-			os.Setenv("GOARCH", a)
+	systems := []string{"linux", "windows", "darwin"}
+	architectures := []string{"amd64", "arm64"}
 
-			// 保存路径
-			path := ""
-			buildPath = "bin/" + p + "-" + a
-			if fileName != "" {
-				path = buildPath + "/" + fileName
-			} else {
-				path = buildPath + "/main-" + p
-			}
-			// windows 下修改路径
-			if p == "windows" {
-				path += ".exe"
-			}
+	// 获取当前工作目录
+	dir, err := os.Getwd()
+	if err != nil {
+		log.Printf("Error getting current directory: %v", err)
+		return
+	}
+	// 获取最后一个目录名
+	lastDir := filepath.Base(dir)
+	if name != "" {
+		lastDir = name
+	}
+	for _, p := range systems {
+		for _, a := range architectures {
+			go func() {
+				buildPath := path.Join(defaultBuildPath, fmt.Sprintf("%s-%s", p, a))
+				if err := os.MkdirAll(buildPath, 0755); err != nil {
+					log.Fatalf("Error creating directory: %v", err)
+				}
 
-			// 执行命令
-			cmd := exec.Command("go", "build", "-o", path, "main.go")
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			err := cmd.Run()
-			if err != nil {
-				fmt.Errorf("error: %s", err.Error())
-			}
-			log.Printf("CrossCompile %s Success\n", p)
+				os.Setenv("GOOS", p)
+				os.Setenv("GOARCH", a)
+
+				outputFile := path.Join(buildPath, lastDir)
+				if p == "windows" {
+					outputFile += ".exe"
+				}
+
+				cmd := exec.Command("go", "build", "-o", outputFile)
+				cmd.Stdout = os.Stdout
+				cmd.Stderr = os.Stderr
+				if err = cmd.Run(); err != nil {
+					log.Fatalf("Error compiling for %s-%s: %v", p, a, err)
+				}
+				log.Printf("CrossCompile %s-%s Success\n", p, a)
+			}()
 		}
 	}
-	// 获取当前工作目录
-	dir, _ := os.Getwd()
-	log.Printf("CrossCompile Build Success, Path: %s\n", path.Join(dir, "bin"))
+
+	log.Printf("CrossCompile Build Success, Path: %s\n", path.Join(dir, defaultBuildPath))
 }
