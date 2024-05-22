@@ -30,10 +30,7 @@ func SelectCmd(args []string) {
 	}
 	switch args[0] {
 	case "build":
-		if args[1] != "" {
-			CrossCompile(args[1])
-		}
-		CrossCompile("")
+		CrossCompile(args, "")
 	case "v":
 		fmt.Println("cs version: 0.0.1")
 	default:
@@ -41,10 +38,27 @@ func SelectCmd(args []string) {
 	}
 }
 
-func CrossCompile(name string) {
-
-	systems := []string{"linux", "windows", "darwin"}
-	architectures := []string{"amd64", "arm64"}
+func CrossCompile(args []string, name string) {
+	noWindows := false
+	var systems []string
+	architectures := []string{"amd64", "386"}
+	if len(args) > 1 {
+		// 循环查看是否存在-nw
+		for _, arg := range args[1:] {
+			if arg == "-nw" {
+				noWindows = true
+			}
+			if arg == "-w" {
+				systems = append(systems, "windows")
+			}
+			if arg == "-l" {
+				systems = append(systems, "linux")
+			}
+			if arg == "-d" {
+				systems = append(systems, "darwin")
+			}
+		}
+	}
 
 	// 获取当前工作目录
 	dir, err := os.Getwd()
@@ -72,7 +86,13 @@ func CrossCompile(name string) {
 				outputFile += ".exe"
 			}
 
-			cmd := exec.Command("go", "build", "-o", outputFile)
+			var cmd *exec.Cmd
+			if !noWindows {
+				cmd = exec.Command("go", "build", "-o", outputFile)
+			} else {
+				cmd = exec.Command("go", "build", "-o", outputFile, "-ldflags", "`-s -w -H=windowsgui`")
+			}
+
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
 			if err = cmd.Run(); err != nil {
