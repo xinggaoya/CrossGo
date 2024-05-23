@@ -86,16 +86,18 @@ func CrossCompile(args []string, name string) {
 				outputFile += ".exe"
 			}
 
-			var cmd *exec.Cmd
+			var instruction []string
 			if !noWindows {
-				cmd = exec.Command("go", "build", "-o", outputFile)
+				instruction = []string{"build", "-o", outputFile}
 			} else {
-				cmd = exec.Command("go", "build", "-o", outputFile, "-ldflags", "`-s -w -H=windowsgui`")
+				instruction = []string{"build", "-o", outputFile, "-ldflags", "-s -w -H=windowsgui"}
 			}
+
+			cmd := exec.Command("go", instruction...)
 
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
-			if err = cmd.Run(); err != nil {
+			if err := cmd.Run(); err != nil {
 				log.Fatalf("Error compiling for %s-%s: %v", p, a, err)
 			}
 			log.Printf("CrossCompile %s-%s Success\n", p, a)
